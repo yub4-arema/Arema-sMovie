@@ -135,9 +135,9 @@ const Card: React.FC<{i: number; text: string}> = ({i, text}) => {
   const p = useSpr(14 + i * 12);
   const tones: Tone[] = ["primary", "tertiary", "secondary"], T = tone(tones[i % 3]);
   return (
-    <div style={{width: 1320, display: "flex", alignItems: "center", gap: 36, background: C.surfaceContainerHigh, borderRadius: 56, padding: "22px 40px 22px 26px", transform: `translateX(${(1 - p) * -120}px) scale(${0.85 + 0.15 * p})`, opacity: Math.min(1, p * 1.5)}}>
+    <div style={{width: 1100, display: "flex", alignItems: "center", gap: 30, background: C.surfaceContainerHigh, borderRadius: 56, padding: "16px 36px 16px 22px", transform: `translateX(${(1 - p) * -120}px) scale(${0.85 + 0.15 * p})`, opacity: Math.min(1, p * 1.5)}}>
       <svg width="96" height="96" viewBox="0 0 96 96"><path d={cookie(48, 48, 40, 8, 6, i)} fill={T.bg} /><text x="48" y="64" textAnchor="middle" fontFamily={FONT} fontWeight={900} fontSize="46" fill={T.on}>{i + 1}</text></svg>
-      <div style={{fontFamily: FONT, fontWeight: 800, fontSize: 58, color: C.onSurface}}>{text}</div>
+      <div style={{fontFamily: FONT, fontWeight: 800, fontSize: 52, color: C.onSurface}}>{text}</div>
     </div>
   );
 };
@@ -164,7 +164,7 @@ const FlowNode: React.FC<{i: number; n: {text: string; tone?: Tone}; w: number; 
   const T = tone(n.tone ?? (["primary", "secondary", "tertiary"] as Tone[])[i % 3]);
   return (
     <>
-      <div style={{width: w, minHeight: 230, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", whiteSpace: "pre-line", textWrap: "balance", background: T.bg, color: T.on, borderRadius: i % 2 ? 90 : 60, padding: 30, fontFamily: FONT, fontWeight: 900, fontSize: n.text.includes("\n") ? 40 : (w >= 380 ? 52 : 42), lineHeight: 1.3, transform: `scale(${0.4 + 0.6 * p})`, opacity: Math.min(1, p * 1.4)}}>{n.text}</div>
+      <div style={{width: w, minHeight: 230, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", whiteSpace: "pre-line", textWrap: "balance", background: T.bg, color: T.on, borderRadius: i % 2 ? 90 : 60, padding: w < 260 ? 12 : 30, fontFamily: FONT, fontWeight: 900, fontSize: w < 260 ? 34 : (n.text.includes("\n") ? 40 : (w >= 380 ? 52 : 42)), lineHeight: 1.3, transform: `scale(${0.4 + 0.6 * p})`, opacity: Math.min(1, p * 1.4)}}>{n.text}</div>
       {!last && <svg width="110" height="60" viewBox="0 0 110 60" style={{opacity: a}}><path d="M5 30 H80" stroke={C.outline} strokeWidth="10" strokeLinecap="round" strokeDasharray="1" /><path d="M72 10 L104 30 L72 50 Z" fill={C.outline} /></svg>}
     </>
   );
@@ -205,8 +205,8 @@ const StackItem: React.FC<{text: string; kind?: string; tone?: Tone; delay: numb
   const p = useSpr(delay, 12, 170), K = KIND(kind, t);
   return (
     <>
-      <div style={{width: 470, height: 40, display: "flex", alignItems: "center", justifyContent: "center", background: K.bg, color: K.fg, border: `3px solid ${K.br}`, borderRadius: kind === "op" ? 999 : 18, fontFamily: FONT, fontWeight: 800, fontSize: 26, transform: `scaleX(${0.5 + 0.5 * p})`, opacity: Math.min(1, p * 1.5)}}>{text}</div>
-      {!last && <div style={{height: 14, color: C.outline, fontSize: 18, lineHeight: "14px", opacity: Math.min(1, p * 1.5)}}>▲</div>}
+      <div style={{width: 470, height: 42, display: "flex", alignItems: "center", justifyContent: "center", background: K.bg, color: K.fg, border: `3px solid ${K.br}`, borderRadius: kind === "op" ? 999 : 18, fontFamily: FONT, fontWeight: 800, fontSize: 28, transform: `scaleX(${0.5 + 0.5 * p})`, opacity: Math.min(1, p * 1.5)}}>{text}</div>
+      {!last && <div style={{height: 12, color: C.outline, fontSize: 16, lineHeight: "12px", opacity: Math.min(1, p * 1.5)}}>▲</div>}
     </>
   );
 };

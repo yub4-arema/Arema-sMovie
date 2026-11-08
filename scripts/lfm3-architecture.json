@@ -1,42 +1,284 @@
-{"source":"Liquid AI「Introducing LFM3」の図 LFM3-1.7B-Base Architecture","speaker":14,"scenes":[
-{"title":"LFM3の図をほどく","speaker":14,"bullets":["全体の流れ","1層の中身と2種類のブロック","層の並び"],
- "subtitle":"今日は、LFM3のアーキテクチャ図を、順番にほどいていきます。図は、全体の流れ、1層の中身、ブロックの中身、層の並びの4つに分けて見ると分かりやすくなります。",
- "narration":"今日は、エルエフエムスリーのアーキテクチャ図を、順番にほどいていきます。図は、全体の流れ、一層の中身、ブロックの中身、層の並びの、四つに分けて見ると、分かりやすくなります。"},
-{"title":"正直、図が細かい","speaker":118,"face":"trouble","big":"図が細かくて…",
- "subtitle":"正直、図が細かくて、何がなんだか分からないんだけど…","narration":"正直、図が細かくて、何がなんだか分からないんだけど。"},
-{"title":"①全体の流れ","speaker":14,
- "diagram":{"type":"flow","nodes":[{"text":"Input\n入力の文章","tone":"secondary"},{"text":"Embedding\n数値のベクトルに","tone":"secondary"},{"text":"24 LAYERS\n同じ型の層を24回","tone":"primary"},{"text":"Norm","tone":"secondary"},{"text":"Linear","tone":"secondary"},{"text":"Output\n出力","tone":"tertiary"}]},
- "subtitle":"まず全体の流れです。図は下から上へ読みます。入力の文章を、Embeddingで数値のベクトルに変えて、24層を通し、最後にNormとLinearを通って、出力になります。",
- "narration":"まず全体の流れです。図は下から上へ読みます。入力の文章を、エンベディングで数値のベクトルに変えて、二十四層を通し、最後に、ノルムとリニアを通って、出力になります。"},
-{"title":"24層は全部同じ?","speaker":118,"big":"全部同じ形なの？",
- "subtitle":"その24層は、全部同じ形なの？","narration":"その二十四層は、全部同じ形なの？"},
-{"title":"②1層の中身","speaker":14,
- "diagram":{"type":"stack","items":[{"text":"＋ 足し算(残差)","kind":"op"},{"text":"Norm"},{"text":"SwiGLU FFN","kind":"block"},{"text":"Norm"},{"text":"＋ 足し算(残差)","kind":"op"},{"text":"Norm"},{"text":"Sequence Block","kind":"block"},{"text":"Norm"},{"text":"入力","kind":"io"}],"notes":["下の段が Sequence Block、上の段が SwiGLU FFN","どちらも前後を Norm で挟む(サンドイッチ)","入力を足し戻す 残差接続つき"]},
- "subtitle":"1層の中身は二段構えです。下の段がSequence Block、上の段がSwiGLU FFN。どちらも前と後ろをNormで挟んで、入力を足し戻す残差接続がついています。この前後を挟む形が、ブログにあるサンドイッチ正規化です。",
- "narration":"一層の中身は、二段構えです。下の段が、シーケンスブロック。上の段が、スイグルーエフエフエヌ。どちらも、前と後ろをノルムで挟んで、入力を足し戻す、残差接続がついています。この、前後を挟む形が、ブログにある、サンドイッチ正規化です。"},
-{"title":"③ブロックは2択","speaker":14,"bullets":["ゲートつき短い畳み込み(C)","または ゲートつきGQA(FかS)","中身だけが層ごとに入れ替わる"],
- "subtitle":"違いが出るのは、Sequence Blockの中身だけです。図の点線のとおり、ゲートつきの短い畳み込みか、ゲートつきGQAの、どちらかが入ります。GQAには、全体を見るFと、窓つきのSがあります。",
- "narration":"違いが出るのは、シーケンスブロックの中身だけです。図の点線のとおり、ゲートつきの短い畳み込みか、ゲートつきジーキューエーの、どちらかが入ります。ジーキューエーには、全体を見るエフと、窓つきのエスがあります。"},
-{"title":"畳み込みブロックの中","speaker":14,
- "diagram":{"type":"flow","nodes":[{"text":"Linear\nB・x・C に3分割","tone":"secondary"},{"text":"B × x\nゲート","tone":"tertiary"},{"text":"Conv1D\n近い7トークン","tone":"primary"},{"text":"× C\nゲート","tone":"tertiary"},{"text":"Linear\n出力","tone":"secondary"}]},
- "subtitle":"畳み込みブロックから見ます。入力はLinearで、B、x、Cの3つに分けられます。BとxをかけてゲートをかけたあとConv1Dで近くのトークンを混ぜ、最後にCをかけて、Linearで出力します。",
- "narration":"畳み込みブロックから見ます。入力は、リニアで、ビー、エックス、シーの、三つに分けられます。ビーとエックスをかけて、ゲートをかけたあと、コンブワンディーで、近くのトークンを混ぜ、最後に、シーをかけて、リニアで出力します。"},
-{"title":"GQAの方は?","speaker":118,"face":"ok","big":"GQAの方は？",
- "subtitle":"じゃあ、GQAの方は？","narration":"じゃあ、ジーキューエーの方は？"},
-{"title":"GQAブロックの中","speaker":14,
- "diagram":{"type":"flow","nodes":[{"text":"Linear\nQ・K・V を作る","tone":"secondary"},{"text":"Q と K に Norm","tone":"secondary"},{"text":"Grouped Query\nAttention","tone":"primary"},{"text":"σ ゲート\nをかける","tone":"tertiary"},{"text":"Linear\n出力","tone":"secondary"}]},
- "subtitle":"GQAブロックは、入力からQ、K、Vを作ります。QとKにはNormがかかっています。注意を計算したあと、別のLinearから作ったシグモイドのゲートをかけて、Linearで出力します。このゲートが、出番のないヘッドを切る、ヘッドごとのゲートです。",
- "narration":"ジーキューエーブロックは、入力から、キュー、ケー、ブイを作ります。キューとケーには、ノルムがかかっています。注意を計算したあと、別のリニアから作った、シグモイドのゲートをかけて、リニアで出力します。このゲートが、出番のないヘッドを切る、ヘッドごとのゲートです。"},
-{"title":"④層の並び","speaker":14,
- "diagram":{"type":"pattern","cells":"CCFCSCFCSCFCSCFCSCFCSCFC","legend":[{"key":"C","label":"短い畳み込み","count":13,"tone":"primary"},{"key":"F","label":"全体注意(GQA)","count":6,"tone":"tertiary"},{"key":"S","label":"窓つき注意(GQA)","count":5,"tone":"secondary"}]},
- "subtitle":"最後に、層の並びです。図の下の帯のとおり、24層は、C、C、Fのあとに、C、S、C、Fを繰り返します。畳み込みが13、全体注意が6、窓つき注意が5。畳み込みを軸にして、4層に1回、全体注意を挟む形です。",
- "narration":"最後に、層の並びです。図の下の帯のとおり、二十四層は、シー、シー、エフの後に、シー、エス、シー、エフを、繰り返します。畳み込みが十三、全体注意が六、窓つき注意が五。畳み込みを軸にして、四層に一回、全体注意を挟む形です。"},
-{"title":"長い文脈でも速い(概念図)","speaker":14,
- "diagram":{"type":"wave","top":"重い","bottom":"軽い","curves":[{"label":"全体注意だけ","tone":"tertiary","points":[0.12,0.22,0.33,0.45,0.58,0.72,0.88]},{"label":"LFM3の混合","tone":"primary","points":[0.12,0.16,0.2,0.24,0.28,0.32,0.36]}]},
- "subtitle":"この並びの狙いは速さです。文章が長くなるほど、全体注意だけだと重くなります。ブログでは、パラメータあたりで比べて、8Kトークンの文脈でLFM2より約25%速いと書かれています。",
- "narration":"この並びの狙いは、速さです。文章が長くなるほど、全体注意だけだと重くなります。ブログでは、パラメータあたりで比べて、八千トークンの文脈で、エルエフエムツーより約二十五パーセント速いと書かれています。"},
-{"title":"まとめ","speaker":14,"bullets":["全体=Embedding→24層→Norm→Linear","1層=Sequence Block+FFN(残差・前後Norm)","Sequence Block=C(13)かGQA(F6・S5)"],
- "subtitle":"まとめです。全体は、Embeddingから24層を通って出力。1層は、Sequence BlockとFFNの二段で、残差と前後のNormつき。Sequence Blockだけが、畳み込みか、GQAに入れ替わります。",
- "narration":"まとめです。全体は、エンベディングから二十四層を通って、出力。一層は、シーケンスブロックと、エフエフエヌの二段で、残差と、前後のノルムつき。シーケンスブロックだけが、畳み込みか、ジーキューエーに入れ替わります。"},
-{"title":"図が読めた","speaker":118,"face":"joy","big":"図が読める！",
- "subtitle":"なるほど。これなら、図が読める気がする！","narration":"なるほど。これなら、図が読める気がする！"}]}
+{
+ "source": "Liquid AI LFM3 ブログの図",
+ "speaker": 14,
+ "scenes": [
+  {
+   "title": "LFM3の図をほどく",
+   "speaker": 14,
+   "bullets": [
+    "全体の流れ",
+    "1層の中身と2種類のブロック",
+    "層の並び"
+   ],
+   "subtitle": "今日は、LFM3のアーキテクチャ図を、順番にほどいていきます。図は、全体の流れ、1層の中身、ブロックの中身、層の並びの4つに分けて見ると分かりやすくなります。",
+   "narration": "今日は、エルエフエムスリーのアーキテクチャ図を、順番にほどいていきます。図は、全体の流れ、一層の中身、ブロックの中身、層の並びの、四つに分けて見ると、分かりやすくなります。"
+  },
+  {
+   "title": "正直、図が細かい",
+   "speaker": 118,
+   "face": "trouble",
+   "big": "図が細かくて…",
+   "subtitle": "正直、図が細かくて、何がなんだか分からないんだけど…",
+   "narration": "正直、図が細かくて、何がなんだか分からないんだけど。"
+  },
+  {
+   "title": "①全体の流れ",
+   "speaker": 14,
+   "diagram": {
+    "type": "flow",
+    "nodes": [
+     {
+      "text": "Input\n入力",
+      "tone": "secondary"
+     },
+     {
+      "text": "Embedding\n埋め込み",
+      "tone": "secondary"
+     },
+     {
+      "text": "24層\n同じ型",
+      "tone": "primary"
+     },
+     {
+      "text": "Norm",
+      "tone": "secondary"
+     },
+     {
+      "text": "Linear",
+      "tone": "secondary"
+     },
+     {
+      "text": "Output\n出力",
+      "tone": "tertiary"
+     }
+    ]
+   },
+   "subtitle": "まず全体の流れです。図は下から上へ読みます。入力の文章を、Embeddingで数値のベクトルに変えて、24層を通し、最後にNormとLinearを通って、出力になります。",
+   "narration": "まず全体の流れです。図は下から上へ読みます。入力の文章を、エンベディングで数値のベクトルに変えて、二十四層を通し、最後に、ノルムとリニアを通って、出力になります。"
+  },
+  {
+   "title": "24層は全部同じ?",
+   "speaker": 118,
+   "big": "全部同じ形なの？",
+   "subtitle": "その24層は、全部同じ形なの？",
+   "narration": "その二十四層は、全部同じ形なの？"
+  },
+  {
+   "title": "②1層の中身",
+   "speaker": 14,
+   "diagram": {
+    "type": "stack",
+    "items": [
+     {
+      "text": "＋ 足し算(残差)",
+      "kind": "op"
+     },
+     {
+      "text": "Norm"
+     },
+     {
+      "text": "SwiGLU FFN",
+      "kind": "block"
+     },
+     {
+      "text": "Norm"
+     },
+     {
+      "text": "＋ 足し算(残差)",
+      "kind": "op"
+     },
+     {
+      "text": "Norm"
+     },
+     {
+      "text": "Sequence Block",
+      "kind": "block"
+     },
+     {
+      "text": "Norm"
+     },
+     {
+      "text": "入力",
+      "kind": "io"
+     }
+    ],
+    "notes": [
+     "下の段が Sequence Block、上の段が SwiGLU FFN",
+     "どちらも前後を Norm で挟む(サンドイッチ)",
+     "入力を足し戻す 残差接続つき"
+    ]
+   },
+   "subtitle": "1層の中身は二段構えです。下の段がSequence Block、上の段がSwiGLU FFN。どちらも前と後ろをNormで挟んで、入力を足し戻す残差接続がついています。この前後を挟む形が、ブログにあるサンドイッチ正規化です。",
+   "narration": "一層の中身は、二段構えです。下の段が、シーケンスブロック。上の段が、スイグルーエフエフエヌ。どちらも、前と後ろをノルムで挟んで、入力を足し戻す、残差接続がついています。この、前後を挟む形が、ブログにある、サンドイッチ正規化です。"
+  },
+  {
+   "title": "③ブロックは2択",
+   "speaker": 14,
+   "bullets": [
+    "ゲートつき短い畳み込み(C)",
+    "または ゲートつきGQA(FかS)",
+    "中身だけが層ごとに入れ替わる"
+   ],
+   "subtitle": "違いが出るのは、Sequence Blockの中身だけです。図の点線のとおり、ゲートつきの短い畳み込みか、ゲートつきGQAの、どちらかが入ります。GQAには、全体を見るFと、窓つきのSがあります。",
+   "narration": "違いが出るのは、シーケンスブロックの中身だけです。図の点線のとおり、ゲートつきの短い畳み込みか、ゲートつきジーキューエーの、どちらかが入ります。ジーキューエーには、全体を見るエフと、窓つきのエスがあります。"
+  },
+  {
+   "title": "畳み込みブロックの中",
+   "speaker": 14,
+   "diagram": {
+    "type": "flow",
+    "nodes": [
+     {
+      "text": "Linear\nB・x・C に3分割",
+      "tone": "secondary"
+     },
+     {
+      "text": "B × x\nゲート",
+      "tone": "tertiary"
+     },
+     {
+      "text": "Conv1D\n近い7トークン",
+      "tone": "primary"
+     },
+     {
+      "text": "× C\nゲート",
+      "tone": "tertiary"
+     },
+     {
+      "text": "Linear\n出力",
+      "tone": "secondary"
+     }
+    ]
+   },
+   "subtitle": "畳み込みブロックから見ます。入力はLinearで、B、x、Cの3つに分けられます。BとxをかけてゲートをかけたあとConv1Dで近くのトークンを混ぜ、最後にCをかけて、Linearで出力します。",
+   "narration": "畳み込みブロックから見ます。入力は、リニアで、ビー、エックス、シーの、三つに分けられます。ビーとエックスをかけて、ゲートをかけたあと、コンブワンディーで、近くのトークンを混ぜ、最後に、シーをかけて、リニアで出力します。"
+  },
+  {
+   "title": "GQAの方は?",
+   "speaker": 118,
+   "face": "ok",
+   "big": "GQAの方は？",
+   "subtitle": "じゃあ、GQAの方は？",
+   "narration": "じゃあ、ジーキューエーの方は？"
+  },
+  {
+   "title": "GQAブロックの中",
+   "speaker": 14,
+   "diagram": {
+    "type": "flow",
+    "nodes": [
+     {
+      "text": "Linear\nQ・K・V を作る",
+      "tone": "secondary"
+     },
+     {
+      "text": "Q と K に Norm",
+      "tone": "secondary"
+     },
+     {
+      "text": "Grouped Query\nAttention",
+      "tone": "primary"
+     },
+     {
+      "text": "σ ゲート\nをかける",
+      "tone": "tertiary"
+     },
+     {
+      "text": "Linear\n出力",
+      "tone": "secondary"
+     }
+    ]
+   },
+   "subtitle": "GQAブロックは、入力からQ、K、Vを作ります。QとKにはNormがかかっています。注意を計算したあと、別のLinearから作ったシグモイドのゲートをかけて、Linearで出力します。このゲートが、出番のないヘッドを切る、ヘッドごとのゲートです。",
+   "narration": "ジーキューエーブロックは、入力から、キュー、ケー、ブイを作ります。キューとケーには、ノルムがかかっています。注意を計算したあと、別のリニアから作った、シグモイドのゲートをかけて、リニアで出力します。このゲートが、出番のないヘッドを切る、ヘッドごとのゲートです。"
+  },
+  {
+   "title": "④層の並び",
+   "speaker": 14,
+   "diagram": {
+    "type": "pattern",
+    "cells": "CCFCSCFCSCFCSCFCSCFCSCFC",
+    "legend": [
+     {
+      "key": "C",
+      "label": "短い畳み込み",
+      "count": 13,
+      "tone": "primary"
+     },
+     {
+      "key": "F",
+      "label": "全体注意(GQA)",
+      "count": 6,
+      "tone": "tertiary"
+     },
+     {
+      "key": "S",
+      "label": "窓つき注意(GQA)",
+      "count": 5,
+      "tone": "secondary"
+     }
+    ]
+   },
+   "subtitle": "最後に、層の並びです。図の下の帯のとおり、24層は、C、C、Fのあとに、C、S、C、Fを繰り返します。畳み込みが13、全体注意が6、窓つき注意が5。畳み込みを軸にして、4層に1回、全体注意を挟む形です。",
+   "narration": "最後に、層の並びです。図の下の帯のとおり、二十四層は、シー、シー、エフの後に、シー、エス、シー、エフを、繰り返します。畳み込みが十三、全体注意が六、窓つき注意が五。畳み込みを軸にして、四層に一回、全体注意を挟む形です。"
+  },
+  {
+   "title": "長い文脈でも速い(概念図)",
+   "speaker": 14,
+   "diagram": {
+    "type": "wave",
+    "top": "重い",
+    "bottom": "軽い",
+    "curves": [
+     {
+      "label": "全体注意だけ",
+      "tone": "tertiary",
+      "points": [
+       0.12,
+       0.22,
+       0.33,
+       0.45,
+       0.58,
+       0.72,
+       0.88
+      ]
+     },
+     {
+      "label": "LFM3の混合",
+      "tone": "primary",
+      "points": [
+       0.12,
+       0.16,
+       0.2,
+       0.24,
+       0.28,
+       0.32,
+       0.36
+      ]
+     }
+    ]
+   },
+   "subtitle": "この並びの狙いは速さです。文章が長くなるほど、全体注意だけだと重くなります。ブログでは、パラメータあたりで比べて、8Kトークンの文脈でLFM2より約25%速いと書かれています。",
+   "narration": "この並びの狙いは、速さです。文章が長くなるほど、全体注意だけだと重くなります。ブログでは、パラメータあたりで比べて、八千トークンの文脈で、エルエフエムツーより約二十五パーセント速いと書かれています。"
+  },
+  {
+   "title": "まとめ",
+   "speaker": 14,
+   "bullets": [
+    "全体=Embedding→24層→Norm→Linear",
+    "1層=Sequence Block+FFN(残差・前後Norm)",
+    "Sequence Block=C(13)かGQA(F6・S5)"
+   ],
+   "subtitle": "まとめです。全体は、Embeddingから24層を通って出力。1層は、Sequence BlockとFFNの二段で、残差と前後のNormつき。Sequence Blockだけが、畳み込みか、GQAに入れ替わります。",
+   "narration": "まとめです。全体は、エンベディングから二十四層を通って、出力。一層は、シーケンスブロックと、エフエフエヌの二段で、残差と、前後のノルムつき。シーケンスブロックだけが、畳み込みか、ジーキューエーに入れ替わります。"
+  },
+  {
+   "title": "図が読めた",
+   "speaker": 118,
+   "face": "joy",
+   "big": "図が読める！",
+   "subtitle": "なるほど。これなら、図が読める気がする！",
+   "narration": "なるほど。これなら、図が読める気がする！"
+  }
+ ]
+}
