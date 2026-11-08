@@ -1,6 +1,6 @@
 // 使い方: node build.mjs script.json out/video.mp4   (VOICEVOXエンジンが localhost:50021 で起動していること)
 import fs from "fs"; import {execSync} from "child_process";
-const [,, scriptPath = "script.json", out = "out/video.mp4", scale = "1"] = process.argv; // scale=0.6667 で 1280x720(速い試作)
+const [,, scriptPath = "script.json", out = "out/video.mp4", scale = "1"] = process.argv; // scale=0.75 で 1440x810(速い試作。解像度が偶数になる倍率のみ可)
 const script = JSON.parse(fs.readFileSync(scriptPath, "utf8"));
 // 声ID: 14=冥鳴ひまり 118=夜語トバリ 126=里石ユカ 3=ずんだもん 2=四国めたん (キャラ絵は src/index.tsx の LOOK で定義)
 const d = {speaker: script.speaker ?? 14, speed: script.speed ?? 1.0, intonation: script.intonation ?? 1.15, pause: script.pause ?? 1.0};

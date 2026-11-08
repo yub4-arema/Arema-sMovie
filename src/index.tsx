@@ -1,21 +1,7 @@
 import React from "react";
 import {registerRoot, Composition, AbsoluteFill, Sequence, Audio, Img, staticFile, useCurrentFrame, useVideoConfig, interpolate, spring} from "remotion";
 
-// ===== Material 3 Expressive (dark, baseline purple seed) tokens =====
-const C = {
-  surface: "#141218", onSurface: "#E6E0E9", onSurfaceVariant: "#CAC4D0",
-  surfaceContainer: "#211F26", surfaceContainerHigh: "#2B2930", outline: "#938F99",
-  primary: "#D0BCFF", onPrimary: "#381E72", primaryContainer: "#4F378B", onPrimaryContainer: "#EADDFF",
-  secondary: "#CCC2DC", onSecondary: "#332D41", secondaryContainer: "#4A4458", onSecondaryContainer: "#E8DEF8",
-  tertiary: "#EFB8C8", onTertiary: "#492532", tertiaryContainer: "#633B48", onTertiaryContainer: "#FFD8E4",
-};
-const FONT = "'Noto Sans CJK JP','Noto Sans JP','IPAexGothic',sans-serif";
-type Tone = "primary" | "secondary" | "tertiary";
-const tone = (t: Tone) => ({
-  primary: {fg: C.primary, bg: C.primaryContainer, on: C.onPrimaryContainer},
-  secondary: {fg: C.secondary, bg: C.secondaryContainer, on: C.onSecondaryContainer},
-  tertiary: {fg: C.tertiary, bg: C.tertiaryContainer, on: C.onTertiaryContainer},
-}[t]);
+import {C, FONT, FPS, Tone, tone, cookie} from "./theme";
 
 type Curve = {label: string; tone?: Tone; points: number[]; dashed?: boolean};
 type Diagram =
@@ -25,7 +11,6 @@ type Diagram =
 type Scene = {title: string; bullets?: string[]; big?: string; diagram?: Diagram; narration: string; subtitle?: string; speaker: number; frames: number; speechFrames: number; audio: string; amp: number[]};
 type Cast = {id: number; side: "left" | "right"};
 type Props = {scenes: Scene[]; cast: Cast[]; source?: string; portraits?: Record<string, string>};
-const FPS = 30;
 
 // 声ごとのオリジナルSVGキャラ設定(VOICEVOXの声に合わせた雰囲気)
 const LOOK: Record<number, {name: string; hair: string; eye: string; acc: "bow" | "moon" | "bud"; sleepy?: boolean; long?: boolean; tone: Tone}> = {
@@ -35,14 +20,6 @@ const LOOK: Record<number, {name: string; hair: string; eye: string; acc: "bow" 
 };
 const lookOf = (id: number) => LOOK[id] ?? {name: `話者${id}`, hair: "#3a3347", eye: "#d0bcff", acc: "bow" as const, tone: "secondary" as Tone};
 
-const cookie = (cx: number, cy: number, r: number, n: number, amp: number, rot: number) => {
-  let d = "";
-  for (let i = 0; i <= 120; i++) {
-    const t = (i / 120) * Math.PI * 2, rr = r + amp * Math.cos(n * t + rot);
-    d += (i ? "L" : "M") + (cx + rr * Math.cos(t)).toFixed(1) + " " + (cy + rr * Math.sin(t)).toFixed(1);
-  }
-  return d + "Z";
-};
 const useSpr = (delay = 0, damping = 11, stiffness = 150) => {
   const f = useCurrentFrame(), {fps} = useVideoConfig();
   return spring({frame: f - delay, fps, config: {damping, stiffness, mass: 0.8}});
@@ -249,7 +226,7 @@ const SceneView: React.FC<{s: Scene; idx: number; total: number}> = ({s, idx, to
     <AbsoluteFill style={{fontFamily: FONT}}>
       <div style={{position: "absolute", left: 90, top: 64, display: "flex", alignItems: "center", gap: 28, transform: `translateX(${(1 - p) * -200}px)`, opacity: Math.min(1, p * 1.6)}}>
         <div style={{background: T.bg, color: T.on, fontWeight: 900, fontSize: 34, padding: "10px 30px", borderRadius: 999}}>{String(idx + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}</div>
-        <div style={{fontWeight: 900, fontSize: 92, color: C.onSurface, letterSpacing: -2}}>{s.title}</div>
+        <div style={{fontWeight: 900, fontSize: Math.max(56, Math.min(92, Math.floor(950 / Math.max(1, s.title.length)))), color: C.onSurface, letterSpacing: -2, whiteSpace: "nowrap"}}>{s.title}</div>
       </div>
       <div style={{position: "absolute", left: 0, right: 0, top: 250, height: 470, display: "flex", alignItems: "center", justifyContent: "center"}}>
         <div style={{width: "100%"}}>

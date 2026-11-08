@@ -22,7 +22,7 @@
 ## 作業の流れ
 1. 内容を調べる(一次情報を優先。出典は台本の `source` に書く)。
 2. 台本を `scripts/<名前>.json` に書く。構成は PREP法/三幕構成(`NOTES.md`)。
-3. VOICEVOX を起動して `node build.mjs scripts/<名前>.json out/<名前>.mp4`。試作は第3引数に `0.6667`(720p)。
+3. VOICEVOX を起動して `node build.mjs scripts/<名前>.json out/<名前>.mp4`。試作は第3引数に `0.75`(1440x810)。
 4. 1フレーム確認(`ffmpeg -ss 1.5 ...` または `remotion still`)。日本語の崩れ・はみ出し・重なりを見る。
 5. チャットに送る。クレジット(VOICEVOX:キャラ名)と出典を添える。
 
@@ -41,5 +41,5 @@
 ## 環境の注意(クラウドセッション)
 - GitHub・Hugging Face・YouTube・ニコニ静画などは直接つながらない。VOICEVOX は Docker Hub のイメージを使う。
 - Docker は `dockerd` を手動で起動する。VOICEVOX イメージ取得に数分かかる。
-- 描画は重い。試作は 720p(`0.6667`)で。背景に `blur` フィルタを使わない。
+- 描画は重い。試作は `0.75`(1440x810)で。背景に `blur` フィルタを使わない。
 - Drive コネクタは動画のアップロードに向かない(base64 を手書きする必要がある)。動画はチャットで渡す。
