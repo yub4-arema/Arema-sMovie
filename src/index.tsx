@@ -1,46 +1,297 @@
 import React from "react";
-import {registerRoot, Composition, AbsoluteFill, Sequence, Audio, staticFile, useCurrentFrame, interpolate} from "remotion";
+import {registerRoot, Composition, AbsoluteFill, Sequence, Audio, Img, staticFile, useCurrentFrame, useVideoConfig, interpolate, spring} from "remotion";
 
-type Scene = {title: string; bullets: string[]; narration: string; frames: number; audio: string};
-type Props = {scenes: Scene[]; fps: number};
+// ===== Material 3 Expressive (dark, baseline purple seed) tokens =====
+const C = {
+  surface: "#141218", onSurface: "#E6E0E9", onSurfaceVariant: "#CAC4D0",
+  surfaceContainer: "#211F26", surfaceContainerHigh: "#2B2930", outline: "#938F99",
+  primary: "#D0BCFF", onPrimary: "#381E72", primaryContainer: "#4F378B", onPrimaryContainer: "#EADDFF",
+  secondary: "#CCC2DC", onSecondary: "#332D41", secondaryContainer: "#4A4458", onSecondaryContainer: "#E8DEF8",
+  tertiary: "#EFB8C8", onTertiary: "#492532", tertiaryContainer: "#633B48", onTertiaryContainer: "#FFD8E4",
+};
+const FONT = "'Noto Sans CJK JP','Noto Sans JP','IPAexGothic',sans-serif";
+type Tone = "primary" | "secondary" | "tertiary";
+const tone = (t: Tone) => ({
+  primary: {fg: C.primary, bg: C.primaryContainer, on: C.onPrimaryContainer},
+  secondary: {fg: C.secondary, bg: C.secondaryContainer, on: C.onSecondaryContainer},
+  tertiary: {fg: C.tertiary, bg: C.tertiaryContainer, on: C.onTertiaryContainer},
+}[t]);
+
+type Curve = {label: string; tone?: Tone; points: number[]; dashed?: boolean};
+type Diagram =
+  | {type: "flow"; nodes: {text: string; tone?: Tone}[]}
+  | {type: "wave"; top: string; bottom: string; curves: Curve[]}
+  | {type: "tally"; rows: {label: string; count: number; tone?: Tone}[]};
+type Scene = {title: string; bullets?: string[]; big?: string; diagram?: Diagram; narration: string; subtitle?: string; speaker: number; frames: number; speechFrames: number; audio: string; amp: number[]};
+type Cast = {id: number; side: "left" | "right"};
+type Props = {scenes: Scene[]; cast: Cast[]; source?: string; portraits?: Record<string, string>};
 const FPS = 30;
 
-const SceneView: React.FC<{s: Scene; idx: number; total: number}> = ({s, idx, total}) => {
+// 声ごとのオリジナルSVGキャラ設定(VOICEVOXの声に合わせた雰囲気)
+const LOOK: Record<number, {name: string; hair: string; eye: string; acc: "bow" | "moon" | "bud"; sleepy?: boolean; long?: boolean; tone: Tone}> = {
+  14: {name: "冥鳴ひまり", hair: "#2b2233", eye: "#9a78e8", acc: "bow", tone: "primary"},
+  118: {name: "夜語トバリ", hair: "#1b1a30", eye: "#f2c94c", acc: "moon", sleepy: true, long: true, tone: "tertiary"},
+  126: {name: "里石ユカ", hair: "#c78aa4", eye: "#6fb8a0", acc: "bud", tone: "secondary"},
+};
+const lookOf = (id: number) => LOOK[id] ?? {name: `話者${id}`, hair: "#3a3347", eye: "#d0bcff", acc: "bow" as const, tone: "secondary" as Tone};
+
+const cookie = (cx: number, cy: number, r: number, n: number, amp: number, rot: number) => {
+  let d = "";
+  for (let i = 0; i <= 120; i++) {
+    const t = (i / 120) * Math.PI * 2, rr = r + amp * Math.cos(n * t + rot);
+    d += (i ? "L" : "M") + (cx + rr * Math.cos(t)).toFixed(1) + " " + (cy + rr * Math.sin(t)).toFixed(1);
+  }
+  return d + "Z";
+};
+const useSpr = (delay = 0, damping = 11, stiffness = 150) => {
+  const f = useCurrentFrame(), {fps} = useVideoConfig();
+  return spring({frame: f - delay, fps, config: {damping, stiffness, mass: 0.8}});
+};
+
+const Background: React.FC = () => {
   const f = useCurrentFrame();
-  const fade = interpolate(f, [0, 12], [0, 1], {extrapolateRight: "clamp"});
+  const blob = (x: number, y: number, s: number, c: string, ph: number): React.CSSProperties => ({
+    position: "absolute", left: x + Math.sin(f / 90 + ph) * 60, top: y + Math.cos(f / 110 + ph) * 50, width: s, height: s,
+    background: `radial-gradient(closest-side, ${c}, transparent)`, opacity: 0.7,
+  });
   return (
-    <AbsoluteFill style={{background: "linear-gradient(135deg,#0f172a,#1e3a8a)", color: "#fff", fontFamily: "'Noto Sans CJK JP','Noto Sans JP',sans-serif", padding: 90, opacity: fade}}>
-      <div style={{fontSize: 30, opacity: 0.6}}>{idx + 1} / {total}</div>
-      <div style={{fontSize: 84, fontWeight: 800, margin: "20px 0 50px"}}>{s.title}</div>
-      {s.bullets.map((b, i) => {
-        const o = interpolate(f, [20 + i * 25, 35 + i * 25], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
-        return <div key={i} style={{fontSize: 52, margin: "18px 0", opacity: o, transform: `translateX(${(1 - o) * 40}px)`}}>▶ {b}</div>;
-      })}
-      <div style={{position: "absolute", left: 90, right: 90, bottom: 60, fontSize: 34, background: "rgba(0,0,0,.45)", padding: "16px 24px", borderRadius: 12}}>{s.narration}</div>
+    <AbsoluteFill style={{background: C.surface}}>
+      <div style={blob(-200, -150, 800, C.primaryContainer, 0)} />
+      <div style={blob(1250, 250, 700, C.tertiaryContainer, 2)} />
+      <div style={blob(500, 700, 600, C.secondaryContainer, 4)} />
     </AbsoluteFill>
   );
 };
 
-const Video: React.FC<Props> = ({scenes}) => {
-  let start = 0;
+const Avatar: React.FC<{id: number; side: "left" | "right"; active: boolean; amp: number; portrait?: string}> = ({id, side, active, amp, portrait}) => {
+  const f = useCurrentFrame();
+  const L = lookOf(id), T = tone(L.tone);
+  const pop = useSpr(side === "left" ? 0 : 8);
+  const act = spring({frame: active ? f % 100000 : 0, fps: FPS, config: {damping: 9, stiffness: 120}}); // 発話開始の弾み用(簡易)
+  const bob = Math.sin(f / (active ? 6 : 16)) * (active ? 8 : 4);
+  const blink = f % 120 < 5 ? 0.15 : 1;
+  const mouth = 3 + amp * 15;
+  const scale = (active ? 1.06 : 0.9) * (0.6 + 0.4 * pop);
+  const hairPath = "M 62 160 Q 62 62 150 62 Q 238 62 238 160 Q 214 110 150 116 Q 86 110 62 160 Z";
   return (
-    <AbsoluteFill>
-      {scenes.map((s, i) => {
-        const from = start; start += s.frames;
+    <div style={{position: "absolute", bottom: 30, [side]: 50, width: 340, height: 380, transform: `translateY(${bob}px) scale(${scale})`, transformOrigin: "50% 100%", opacity: active ? 1 : 0.6, filter: active ? "none" : "saturate(.6)"} as React.CSSProperties}>
+      {portrait ? (
+        <>
+          <svg viewBox="0 0 300 330" width="340" height="374" style={{position: "absolute", left: 0, top: 0, overflow: "visible"}}><path d={cookie(150, 160, 128, 10, 9, f / 70)} fill={T.bg} /></svg>
+          <div style={{position: "absolute", left: 20, right: 20, top: 0, height: 360, overflow: "hidden", borderRadius: "40px 40px 90px 90px"}}>
+            <Img src={staticFile(portrait)} style={{position: "absolute", left: "50%", top: 0, height: 520, transform: `translateX(-50%) scaleY(${1 + amp * 0.03})`, transformOrigin: "50% 100%"}} />
+          </div>
+        </>
+      ) : (
+      <svg viewBox="0 0 300 330" width="340" height="374" style={{overflow: "visible"}}>
+        <path d={cookie(150, 160, 128, 10, 9, f / 70)} fill={T.bg} />
+        {L.long && <path d="M 52 150 Q 50 300 110 300 L 190 300 Q 250 300 248 150 Z" fill={L.hair} />}
+        <ellipse cx="150" cy="150" rx="98" ry="100" fill={L.hair} />
+        <ellipse cx="150" cy="170" rx="80" ry="76" fill="#FFE8E0" />
+        <path d={hairPath} fill={L.hair} />
+        <path d="M 150 62 Q 130 110 150 128 Q 170 110 150 62 Z" fill={L.hair} />
+        {[115, 185].map((x) => (
+          <g key={x}>
+            <ellipse cx={x} cy="172" rx="12" ry={(L.sleepy ? 8 : 15) * blink} fill={L.eye} />
+            <ellipse cx={x - 3} cy="168" rx="4" ry={4 * blink} fill="#fff" />
+            {L.sleepy && <path d={`M ${x - 15} 163 Q ${x} 157 ${x + 15} 163`} stroke={L.hair} strokeWidth="4" fill="none" strokeLinecap="round" />}
+          </g>
+        ))}
+        <ellipse cx="96" cy="196" rx="14" ry="8" fill="#ff8fa8" opacity=".35" />
+        <ellipse cx="204" cy="196" rx="14" ry="8" fill="#ff8fa8" opacity=".35" />
+        <ellipse cx="150" cy="212" rx="12" ry={mouth} fill="#8a2f4a" />
+        {L.acc === "bow" && <g transform="translate(222 84) rotate(18)"><path d="M0 0 L-30 -20 L-30 20 Z M0 0 L30 -20 L30 20 Z" fill={C.primary} /><circle r="8" fill={C.onPrimary} /><path d="M0 -4 L2 1 L7 1 L3 4 L4 9 L0 6 L-4 9 L-3 4 L-7 1 L-2 1Z" fill="#ffe27a" transform="translate(26 26) scale(.8)" /></g>}
+        {L.acc === "moon" && <g transform="translate(76 92)"><circle r="20" fill="#ffe9a8" /><circle cx="9" cy="-4" r="17" fill={L.hair} /></g>}
+        {L.acc === "bud" && <g transform="translate(224 88)"><circle r="12" fill="#ffd1e0" /><circle cx="-14" cy="-8" r="9" fill="#ffb3cb" /><circle cx="12" cy="-14" r="9" fill="#ffb3cb" /><circle r="5" fill="#fff3b0" /></g>}
+      </svg>
+      )}
+      <div style={{position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)", background: T.fg, color: C.surface, fontFamily: FONT, fontWeight: 800, fontSize: 26, padding: "6px 22px", borderRadius: 999, whiteSpace: "nowrap"}}>{L.name}</div>
+    </div>
+  );
+};
+
+const splitChunks = (text: string) => {
+  const sents = text.split(/(?<=[。！？!?])/).filter(Boolean);
+  return sents.flatMap((s) => {
+    if (s.length <= 36) return [s];
+    const out: string[] = []; let buf = "";
+    for (const p of s.split(/(?<=、)/)) { if (buf && (buf + p).length > 34) { out.push(buf); buf = ""; } buf += p; }
+    if (buf) out.push(buf); return out;
+  });
+};
+
+const Subtitle: React.FC<{s: Scene}> = ({s}) => {
+  const f = useCurrentFrame();
+  const chunks = splitChunks(s.subtitle ?? s.narration), total = chunks.reduce((a, c) => a + c.length, 0);
+  const t = Math.max(0, f - 6) / Math.max(1, s.speechFrames - 6) * total;
+  let acc = 0, idx = chunks.length - 1;
+  for (let i = 0; i < chunks.length; i++) { acc += chunks[i].length; if (t < acc) { idx = i; break; } }
+  const local = f - 6 - (chunks.slice(0, idx).reduce((a, c) => a + c.length, 0) / total) * (s.speechFrames - 6);
+  const pop = spring({frame: local, fps: FPS, config: {damping: 14, stiffness: 220}});
+  const T = tone(lookOf(s.speaker).tone);
+  return (
+    <div style={{position: "absolute", left: 450, right: 450, bottom: 60, minHeight: 150, display: "flex", alignItems: "center", justifyContent: "center",
+      background: C.surfaceContainerHigh, borderRadius: 64, padding: "26px 44px", borderLeft: `14px solid ${T.fg}`, transform: `scale(${0.96 + 0.04 * Math.min(1, pop)})`, boxShadow: "0 10px 40px rgba(0,0,0,.45)"}}>
+      <div style={{fontFamily: FONT, fontWeight: 800, fontSize: 44, lineHeight: 1.4, color: C.onSurface, textAlign: "center", textWrap: "balance"} as React.CSSProperties}>{chunks[idx]}</div>
+    </div>
+  );
+};
+
+const Cards: React.FC<{items: string[]}> = ({items}) => (
+  <div style={{display: "flex", flexDirection: "column", gap: 26, alignItems: "center"}}>
+    {items.map((b, i) => <Card key={i} i={i} text={b} />)}
+  </div>
+);
+const Card: React.FC<{i: number; text: string}> = ({i, text}) => {
+  const p = useSpr(14 + i * 12);
+  const tones: Tone[] = ["primary", "tertiary", "secondary"], T = tone(tones[i % 3]);
+  return (
+    <div style={{width: 1320, display: "flex", alignItems: "center", gap: 36, background: C.surfaceContainerHigh, borderRadius: 56, padding: "22px 40px 22px 26px", transform: `translateX(${(1 - p) * -120}px) scale(${0.85 + 0.15 * p})`, opacity: Math.min(1, p * 1.5)}}>
+      <svg width="96" height="96" viewBox="0 0 96 96"><path d={cookie(48, 48, 40, 8, 6, i)} fill={T.bg} /><text x="48" y="64" textAnchor="middle" fontFamily={FONT} fontWeight={900} fontSize="46" fill={T.on}>{i + 1}</text></svg>
+      <div style={{fontFamily: FONT, fontWeight: 800, fontSize: 58, color: C.onSurface}}>{text}</div>
+    </div>
+  );
+};
+
+const Big: React.FC<{text: string; t: Tone}> = ({text, t}) => {
+  const p = useSpr(10, 8, 120), T = tone(t);
+  return (
+    <div style={{display: "flex", justifyContent: "center"}}>
+      <div style={{background: T.bg, color: T.on, borderRadius: 110, padding: "56px 110px", fontFamily: FONT, fontWeight: 900, fontSize: 120, transform: `scale(${0.5 + 0.5 * p}) rotate(${(1 - p) * -6}deg)`, boxShadow: "0 16px 60px rgba(0,0,0,.4)"}}>{text}</div>
+    </div>
+  );
+};
+
+const Flow: React.FC<{nodes: {text: string; tone?: Tone}[]}> = ({nodes}) => {
+  const w = Math.min(420, Math.floor((1760 - (nodes.length - 1) * 130) / nodes.length));
+  return (
+    <div style={{display: "flex", alignItems: "center", justifyContent: "center", gap: 10}}>
+      {nodes.map((n, i) => <FlowNode key={i} i={i} n={n} w={w} last={i === nodes.length - 1} />)}
+    </div>
+  );
+};
+const FlowNode: React.FC<{i: number; n: {text: string; tone?: Tone}; w: number; last: boolean}> = ({i, n, w, last}) => {
+  const p = useSpr(12 + i * 22), a = useSpr(22 + i * 22, 20, 100);
+  const T = tone(n.tone ?? (["primary", "secondary", "tertiary"] as Tone[])[i % 3]);
+  return (
+    <>
+      <div style={{width: w, minHeight: 230, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", whiteSpace: "pre-line", textWrap: "balance", background: T.bg, color: T.on, borderRadius: i % 2 ? 90 : 60, padding: 30, fontFamily: FONT, fontWeight: 900, fontSize: n.text.includes("\n") ? 40 : (w >= 380 ? 52 : 42), lineHeight: 1.3, transform: `scale(${0.4 + 0.6 * p})`, opacity: Math.min(1, p * 1.4)}}>{n.text}</div>
+      {!last && <svg width="110" height="60" viewBox="0 0 110 60" style={{opacity: a}}><path d="M5 30 H80" stroke={C.outline} strokeWidth="10" strokeLinecap="round" strokeDasharray="1" /><path d="M72 10 L104 30 L72 50 Z" fill={C.outline} /></svg>}
+    </>
+  );
+};
+
+const TallyRow: React.FC<{r: {label: string; count: number}; T: {fg: string; bg: string; on: string}; base: number}> = ({r, T, base}) => {
+  const f = useCurrentFrame(), {fps} = useVideoConfig();
+  return (
+    <div style={{display: "flex", alignItems: "center", gap: 30, width: 1600}}>
+      <div style={{width: 560, fontFamily: FONT, fontWeight: 800, fontSize: 44, color: T.fg}}>{r.label}</div>
+      <div style={{display: "flex", gap: 8, flexWrap: "wrap", flex: 1}}>
+        {Array.from({length: r.count}).map((_, i) => {
+          const p = spring({frame: f - 10 - (base + i) * 2, fps, config: {damping: 10, stiffness: 200}});
+          return <div key={i} style={{width: 44, height: 44, borderRadius: i % 2 ? 22 : 12, background: T.bg, border: `3px solid ${T.fg}`, transform: `scale(${Math.max(0, p)})`}} />;
+        })}
+      </div>
+      <div style={{fontFamily: FONT, fontWeight: 900, fontSize: 72, color: T.fg, width: 130, textAlign: "right"}}>{r.count}</div>
+    </div>
+  );
+};
+const Tally: React.FC<{rows: {label: string; count: number; tone?: Tone}[]}> = ({rows}) => {
+  let k = 0;
+  return (
+    <div style={{display: "flex", flexDirection: "column", gap: 34, alignItems: "center"}}>
+      {rows.map((r, ri) => { const base = k; k += r.count; return <TallyRow key={ri} r={r} base={base} T={tone(r.tone ?? (["primary", "tertiary", "secondary"] as Tone[])[ri % 3])} />; })}
+    </div>
+  );
+};
+
+const Wave: React.FC<{d: Extract<Diagram, {type: "wave"}>}> = ({d}) => {
+  const f = useCurrentFrame();
+  const W = 1760, H = 440, x0 = 200, x1 = 1250;
+  const prog = interpolate(f, [18, 110], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
+  const path = (pts: number[]) => {
+    const P = pts.map((v, i) => [x0 + (i / (pts.length - 1)) * (x1 - x0), 30 + (1 - v) * (H - 60)]);
+    let dd = `M${P[0][0]} ${P[0][1]}`;
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[i - 1] ?? P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] ?? p2;
+      dd += ` C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)} ${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)} ${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+    }
+    return dd;
+  };
+  const rawY = d.curves.map((c) => 30 + (1 - c.points[c.points.length - 1]) * (H - 60));
+  const order = rawY.map((y, i) => [y, i]).sort((a, b) => a[0] - b[0]);
+  const labelY: number[] = []; let prev = -999;
+  for (const [y, i] of order) { const yy = Math.max(y, prev + 50); labelY[i] = yy; prev = yy; }
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{display: "block", margin: "0 auto"}}>
+      <rect x={x0 - 14} y="20" width="10" height={H - 40} rx="5" fill={C.outline} />
+      <text x={x0 - 34} y="48" textAnchor="end" fontFamily={FONT} fontWeight={900} fontSize="44" fill={C.primary}>{d.top}</text>
+      <text x={x0 - 34} y={H - 22} textAnchor="end" fontFamily={FONT} fontWeight={900} fontSize="44" fill={C.tertiary}>{d.bottom}</text>
+      <line x1={x0} y1={H / 2} x2={x1} y2={H / 2} stroke={C.outline} strokeWidth="4" strokeDasharray="4 14" strokeLinecap="round" />
+      {d.curves.map((c, i) => {
+        const col = tone(c.tone ?? (["primary", "tertiary", "secondary"] as Tone[])[i % 3]).fg;
+        const ly = labelY[i];
         return (
-          <Sequence key={i} from={from} durationInFrames={s.frames}>
-            <SceneView s={s} idx={i} total={scenes.length} />
-            <Audio src={staticFile(s.audio)} />
-          </Sequence>
+          <g key={i}>
+            <path d={path(c.points)} pathLength={1} fill="none" stroke={col} strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={c.dashed ? "0.02 0.02" : "1"} strokeDashoffset={c.dashed ? 0 : 1 - prog} opacity={c.dashed ? prog : 1} />
+            <text x={x1 + 18} y={ly + 14} fontFamily={FONT} fontWeight={800} fontSize="36" fill={col} opacity={prog}>{c.label}</text>
+          </g>
         );
       })}
+    </svg>
+  );
+};
+
+const SceneView: React.FC<{s: Scene; idx: number; total: number}> = ({s, idx, total}) => {
+  const p = useSpr(0, 13, 170);
+  const T = tone(lookOf(s.speaker).tone);
+  return (
+    <AbsoluteFill style={{fontFamily: FONT}}>
+      <div style={{position: "absolute", left: 90, top: 64, display: "flex", alignItems: "center", gap: 28, transform: `translateX(${(1 - p) * -200}px)`, opacity: Math.min(1, p * 1.6)}}>
+        <div style={{background: T.bg, color: T.on, fontWeight: 900, fontSize: 34, padding: "10px 30px", borderRadius: 999}}>{String(idx + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}</div>
+        <div style={{fontWeight: 900, fontSize: 92, color: C.onSurface, letterSpacing: -2}}>{s.title}</div>
+      </div>
+      <div style={{position: "absolute", left: 0, right: 0, top: 250, height: 470, display: "flex", alignItems: "center", justifyContent: "center"}}>
+        <div style={{width: "100%"}}>
+          {s.diagram?.type === "flow" && <Flow nodes={s.diagram.nodes} />}
+          {s.diagram?.type === "wave" && <Wave d={s.diagram} />}
+          {s.diagram?.type === "tally" && <Tally rows={s.diagram.rows} />}
+          {!s.diagram && s.big && <Big text={s.big} t={lookOf(s.speaker).tone} />}
+          {!s.diagram && !s.big && s.bullets && <Cards items={s.bullets} />}
+        </div>
+      </div>
+      <Subtitle s={s} />
+    </AbsoluteFill>
+  );
+};
+
+const Video: React.FC<Props> = ({scenes, cast, source, portraits}) => {
+  const frame = useCurrentFrame();
+  let start = 0, cur = scenes[0], curStart = 0;
+  const starts = scenes.map((s) => { const st = start; start += s.frames; if (frame >= st) { cur = s; curStart = st; } return st; });
+  const local = frame - curStart;
+  const amp = cur ? (cur.amp[local] ?? 0) : 0;
+  const inSpeech = cur ? local < cur.speechFrames : false;
+  return (
+    <AbsoluteFill>
+      <Background />
+      {scenes.map((s, i) => (
+        <Sequence key={i} from={starts[i]} durationInFrames={s.frames}>
+          <SceneView s={s} idx={i} total={scenes.length} />
+          <Audio src={staticFile(s.audio)} />
+        </Sequence>
+      ))}
+      {cast.map((c) => <Avatar key={c.id} id={c.id} side={c.side} portrait={portraits?.[String(c.id)]} active={!!cur && cur.speaker === c.id && inSpeech} amp={cur && cur.speaker === c.id && inSpeech ? amp : 0} />)}
+      <div style={{position: "absolute", right: 50, top: 40, fontFamily: FONT, fontSize: 22, color: C.onSurfaceVariant, background: C.surfaceContainer, padding: "6px 20px", borderRadius: 999}}>
+        VOICEVOX: {cast.map((c) => lookOf(c.id).name).join(" / ")}
+      </div>
+      {source && <div style={{position: "absolute", right: 50, top: 88, fontFamily: FONT, fontSize: 22, color: C.onSurfaceVariant, background: C.surfaceContainer, padding: "6px 20px", borderRadius: 999}}>出典: {source}</div>}
     </AbsoluteFill>
   );
 };
 
 registerRoot(() => (
-  <Composition id="Explainer" component={Video} width={1920} height={1080} fps={FPS}
-    durationInFrames={300}
-    defaultProps={{scenes: [], fps: FPS} as Props}
+  <Composition id="Explainer" component={Video} width={1920} height={1080} fps={FPS} durationInFrames={300}
+    defaultProps={{scenes: [], cast: [], source: ""} as Props}
     calculateMetadata={({props}) => ({durationInFrames: Math.max(1, (props as Props).scenes.reduce((a, s) => a + s.frames, 0))})} />
 ));
