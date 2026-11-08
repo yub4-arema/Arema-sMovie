@@ -20,7 +20,13 @@ for (const [i, s] of script.scenes.entries()) {
   scenes.push({...s, speaker, audio: name, amp: sm, speechFrames: Math.ceil(sec * FPS), frames: Math.ceil((sec + 0.5) * FPS)});
 }
 const cast = order.slice(0, 2).map((id, k) => ({id, side: k === 0 ? "left" : "right"}));
-// 公式立ち絵(任意): public/characters/<声ID>.png があれば自動で使う。なければSVGキャラ
-const portraits = {}; for (const c of cast) if (fs.existsSync(`public/characters/${c.id}.png`)) portraits[c.id] = `characters/${c.id}.png`;
+// 立ち絵(任意): public/characters/<声ID>/ に 0.png,1.png,2.png(口パク: 閉じ/半開き/開き)と face_<名前>.png(表情)を置くと使う。なければSVGキャラ
+const portraits = {};
+for (const c of cast) {
+  const dir = `public/characters/${c.id}`; if (!fs.existsSync(dir)) continue;
+  const files = fs.readdirSync(dir), frames = ["0.png", "1.png", "2.png"].filter((f) => files.includes(f)).map((f) => `characters/${c.id}/${f}`);
+  const faces = Object.fromEntries(files.filter((f) => /^face_.+\.png$/.test(f)).map((f) => [f.slice(5, -4), `characters/${c.id}/${f}`]));
+  if (frames.length || Object.keys(faces).length) portraits[c.id] = {frames, faces};
+}
 fs.writeFileSync("out/props.json", JSON.stringify({scenes, cast, source: script.source ?? "", portraits}));
 execSync(`npx remotion render src/index.tsx Explainer ${out} --props=out/props.json --browser-executable=/opt/pw-browsers/chromium --crf=28 --scale=${scale} --concurrency=4`, {stdio: "inherit"});

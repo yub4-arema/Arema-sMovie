@@ -7,10 +7,12 @@ type Curve = {label: string; tone?: Tone; points: number[]; dashed?: boolean};
 type Diagram =
   | {type: "flow"; nodes: {text: string; tone?: Tone}[]}
   | {type: "wave"; top: string; bottom: string; curves: Curve[]}
-  | {type: "tally"; rows: {label: string; count: number; tone?: Tone}[]};
-type Scene = {title: string; bullets?: string[]; big?: string; diagram?: Diagram; narration: string; subtitle?: string; speaker: number; frames: number; speechFrames: number; audio: string; amp: number[]};
+  | {type: "tally"; rows: {label: string; count: number; tone?: Tone}[]}
+  | {type: "stack"; items: {text: string; kind?: "norm" | "block" | "op" | "io"; tone?: Tone}[]; notes?: string[]}
+  | {type: "pattern"; cells: string; legend: {key: string; label: string; count: number; tone: Tone}[]};
+type Scene = {title: string; bullets?: string[]; big?: string; diagram?: Diagram; narration: string; subtitle?: string; face?: string; speaker: number; frames: number; speechFrames: number; audio: string; amp: number[]};
 type Cast = {id: number; side: "left" | "right"};
-type Props = {scenes: Scene[]; cast: Cast[]; source?: string; portraits?: Record<string, string>};
+type Props = {scenes: Scene[]; cast: Cast[]; source?: string; portraits?: Record<string, {frames?: string[]; faces?: Record<string, string>}>};
 
 // 声ごとのオリジナルSVGキャラ設定(VOICEVOXの声に合わせた雰囲気)
 const LOOK: Record<number, {name: string; hair: string; eye: string; acc: "bow" | "moon" | "bud"; sleepy?: boolean; long?: boolean; tone: Tone}> = {
@@ -40,7 +42,17 @@ const Background: React.FC = () => {
   );
 };
 
-const Avatar: React.FC<{id: number; side: "left" | "right"; active: boolean; amp: number; portrait?: string}> = ({id, side, active, amp, portrait}) => {
+type Portrait = {frames?: string[]; faces?: Record<string, string>};
+// 口パク: frames(閉じ/半開き/開き)を音量で切り替える。frames が無ければ表情(faces)を使う
+const portraitSrc = (pr: Portrait, active: boolean, amp: number, face?: string) => {
+  if (pr.frames && pr.frames.length) {
+    const n = pr.frames.length, i = !active ? 0 : amp < 0.12 ? 0 : amp < 0.35 ? Math.min(1, n - 1) : n - 1;
+    return pr.frames[i];
+  }
+  const fc = pr.faces ?? {};
+  return (active && face && fc[face]) || fc.default || Object.values(fc)[0];
+};
+const Avatar: React.FC<{id: number; side: "left" | "right"; active: boolean; amp: number; portrait?: Portrait; face?: string}> = ({id, side, active, amp, portrait, face}) => {
   const f = useCurrentFrame();
   const L = lookOf(id), T = tone(L.tone);
   const pop = useSpr(side === "left" ? 0 : 8);
@@ -55,8 +67,8 @@ const Avatar: React.FC<{id: number; side: "left" | "right"; active: boolean; amp
       {portrait ? (
         <>
           <svg viewBox="0 0 300 330" width="340" height="374" style={{position: "absolute", left: 0, top: 0, overflow: "visible"}}><path d={cookie(150, 160, 128, 10, 9, f / 70)} fill={T.bg} /></svg>
-          <div style={{position: "absolute", left: 20, right: 20, top: 0, height: 360, overflow: "hidden", borderRadius: "40px 40px 90px 90px"}}>
-            <Img src={staticFile(portrait)} style={{position: "absolute", left: "50%", top: 0, height: 520, transform: `translateX(-50%) scaleY(${1 + amp * 0.03})`, transformOrigin: "50% 100%"}} />
+          <div style={{position: "absolute", left: 20, right: 20, top: 8, height: 340, overflow: "hidden", borderRadius: "56px 56px 96px 96px", background: T.bg}}>
+            <Img src={staticFile(portraitSrc(portrait, active, amp, face))} style={{position: "absolute", left: 0, top: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 0%", transform: `scaleY(${1 + amp * 0.025})`, transformOrigin: "50% 100%"}} />
           </div>
         </>
       ) : (
@@ -182,6 +194,66 @@ const Tally: React.FC<{rows: {label: string; count: number; tone?: Tone}[]}> = (
   );
 };
 
+const KIND = (k: string | undefined, t: Tone | undefined) => {
+  if (k === "block") return {bg: C.primaryContainer, fg: C.onPrimaryContainer, br: C.primary};
+  if (k === "op") return {bg: C.secondaryContainer, fg: C.onSecondaryContainer, br: C.secondary};
+  if (k === "io") return {bg: C.surfaceContainerHigh, fg: C.onSurface, br: C.outline};
+  if (t) { const T = tone(t); return {bg: T.bg, fg: T.on, br: T.fg}; }
+  return {bg: C.surfaceContainer, fg: C.onSurfaceVariant, br: C.outline};
+};
+const StackItem: React.FC<{text: string; kind?: string; tone?: Tone; delay: number; last: boolean}> = ({text, kind, tone: t, delay, last}) => {
+  const p = useSpr(delay, 12, 170), K = KIND(kind, t);
+  return (
+    <>
+      <div style={{width: 470, height: 40, display: "flex", alignItems: "center", justifyContent: "center", background: K.bg, color: K.fg, border: `3px solid ${K.br}`, borderRadius: kind === "op" ? 999 : 18, fontFamily: FONT, fontWeight: 800, fontSize: 26, transform: `scaleX(${0.5 + 0.5 * p})`, opacity: Math.min(1, p * 1.5)}}>{text}</div>
+      {!last && <div style={{height: 14, color: C.outline, fontSize: 18, lineHeight: "14px", opacity: Math.min(1, p * 1.5)}}>▲</div>}
+    </>
+  );
+};
+const Stack: React.FC<{d: Extract<Diagram, {type: "stack"}>}> = ({d}) => {
+  const n = d.items.length;
+  return (
+    <div style={{display: "flex", alignItems: "center", justifyContent: "center", gap: 90}}>
+      <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
+        {d.items.map((it, i) => <StackItem key={i} text={it.text} kind={it.kind} tone={it.tone} delay={10 + (n - 1 - i) * 8} last={i === n - 1} />)}
+      </div>
+      {d.notes && <div style={{display: "flex", flexDirection: "column", gap: 22, width: 900}}>{d.notes.map((t, i) => <Note key={i} i={i} text={t} />)}</div>}
+    </div>
+  );
+};
+const Note: React.FC<{i: number; text: string}> = ({i, text}) => {
+  const p = useSpr(30 + i * 22), T = tone((["primary", "tertiary", "secondary"] as Tone[])[i % 3]);
+  return (
+    <div style={{background: C.surfaceContainerHigh, borderLeft: `12px solid ${T.fg}`, borderRadius: 40, padding: "18px 34px", fontFamily: FONT, fontWeight: 800, fontSize: 40, lineHeight: 1.3, color: C.onSurface, transform: `translateX(${(1 - p) * 80}px)`, opacity: Math.min(1, p * 1.5)}}>{text}</div>
+  );
+};
+const Pattern: React.FC<{d: Extract<Diagram, {type: "pattern"}>}> = ({d}) => {
+  const f = useCurrentFrame(), {fps} = useVideoConfig();
+  const col = (k: string) => { const l = d.legend.find((x) => x.key === k); return tone(l ? l.tone : "secondary"); };
+  return (
+    <div style={{display: "flex", flexDirection: "column", alignItems: "center", gap: 44}}>
+      <div style={{display: "flex", gap: 6}}>
+        {d.cells.split("").map((ch, i) => {
+          const p = spring({frame: f - 8 - i * 3, fps, config: {damping: 10, stiffness: 220}}), T = col(ch);
+          return <div key={i} style={{width: 62, height: 84, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: ch === "C" ? 16 : 31, background: T.bg, border: `3px solid ${T.fg}`, color: T.on, fontFamily: FONT, fontWeight: 900, fontSize: 38, transform: `scale(${Math.max(0, p)})`}}>{ch}</div>;
+        })}
+      </div>
+      <div style={{display: "flex", gap: 56}}>
+        {d.legend.map((l, i) => {
+          const T = tone(l.tone), p = useSpr(8 + 24 * 3 + i * 14);
+          return (
+            <div key={i} style={{display: "flex", alignItems: "center", gap: 18, opacity: Math.min(1, p * 1.5), transform: `translateY(${(1 - p) * 30}px)`}}>
+              <div style={{width: 56, height: 56, borderRadius: l.key === "C" ? 14 : 28, background: T.bg, border: `3px solid ${T.fg}`, color: T.on, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT, fontWeight: 900, fontSize: 32}}>{l.key}</div>
+              <div style={{fontFamily: FONT, fontWeight: 800, fontSize: 34, color: C.onSurface}}>{l.label}</div>
+              <div style={{fontFamily: FONT, fontWeight: 900, fontSize: 56, color: T.fg}}>{l.count}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const Wave: React.FC<{d: Extract<Diagram, {type: "wave"}>}> = ({d}) => {
   const f = useCurrentFrame();
   const W = 1760, H = 440, x0 = 200, x1 = 1250;
@@ -233,6 +305,8 @@ const SceneView: React.FC<{s: Scene; idx: number; total: number}> = ({s, idx, to
           {s.diagram?.type === "flow" && <Flow nodes={s.diagram.nodes} />}
           {s.diagram?.type === "wave" && <Wave d={s.diagram} />}
           {s.diagram?.type === "tally" && <Tally rows={s.diagram.rows} />}
+          {s.diagram?.type === "stack" && <Stack d={s.diagram} />}
+          {s.diagram?.type === "pattern" && <Pattern d={s.diagram} />}
           {!s.diagram && s.big && <Big text={s.big} t={lookOf(s.speaker).tone} />}
           {!s.diagram && !s.big && s.bullets && <Cards items={s.bullets} />}
         </div>
@@ -258,7 +332,7 @@ const Video: React.FC<Props> = ({scenes, cast, source, portraits}) => {
           <Audio src={staticFile(s.audio)} />
         </Sequence>
       ))}
-      {cast.map((c) => <Avatar key={c.id} id={c.id} side={c.side} portrait={portraits?.[String(c.id)]} active={!!cur && cur.speaker === c.id && inSpeech} amp={cur && cur.speaker === c.id && inSpeech ? amp : 0} />)}
+      {cast.map((c) => <Avatar key={c.id} id={c.id} side={c.side} portrait={portraits?.[String(c.id)]} face={cur && cur.speaker === c.id ? cur.face : undefined} active={!!cur && cur.speaker === c.id && inSpeech} amp={cur && cur.speaker === c.id && inSpeech ? amp : 0} />)}
       <div style={{position: "absolute", right: 50, top: 40, fontFamily: FONT, fontSize: 22, color: C.onSurfaceVariant, background: C.surfaceContainer, padding: "6px 20px", borderRadius: 999}}>
         VOICEVOX: {cast.map((c) => lookOf(c.id).name).join(" / ")}
       </div>
