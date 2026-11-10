@@ -350,6 +350,7 @@ def wrap(s, size, maxw):
 def render(canvas_fn_list, sub):
     im = Image.new("RGB", (W, H), BG); d = ImageDraw.Draw(im)
     for fn in canvas_fn_list: fn(d)
+    if VV_CREDIT: d.text((W - 16, SUB_TOP - 28), "音声: " + VV_CREDIT, font=F(20), fill=GRAY, anchor="ra")
     d.rectangle([0, SUB_TOP, W, H], fill="#111827")
     lines = wrap(sub, 34, 1160)
     lh = 46; y0 = SUB_TOP + (H - SUB_TOP - lh * len(lines)) / 2
@@ -357,7 +358,46 @@ def render(canvas_fn_list, sub):
         d.text((W / 2, y0 + i * lh), ln, font=F(34), fill="white", anchor="ma")
     return im
 
+# ---------- 音声 ----------
+# VOICEVOX を使う: エンジンを起動してから
+#   VOICEVOX_SPEAKER="ナースロボ" python3 make_video.py
+# VOICEVOX_URL(既定 http://127.0.0.1:50021) / VOICEVOX_STYLE(既定 ノーマル) も指定できる。
+# 未指定なら pyopenjtalk(棒読み)を使う。
+import io, json, urllib.parse, urllib.request
+VV_URL = os.environ.get("VOICEVOX_URL", "http://127.0.0.1:50021")
+VV_NAME = os.environ.get("VOICEVOX_SPEAKER", "")
+VV_STYLE = os.environ.get("VOICEVOX_STYLE", "ノーマル")
+VV_CREDIT = ""
+
+def vv_call(path, data=None, query=None):
+    url = VV_URL + path + ("?" + urllib.parse.urlencode(query) if query else "")
+    req = urllib.request.Request(url, data=data, method="POST" if data is not None or query else "GET",
+                                 headers={"Content-Type": "application/json"})
+    return urllib.request.urlopen(req, timeout=120).read()
+
+def vv_pick_speaker():
+    global VV_CREDIT
+    speakers = json.loads(vv_call("/speakers"))
+    hit = [sp for sp in speakers if VV_NAME in sp["name"]]
+    if not hit:
+        names = ", ".join(sp["name"] for sp in speakers)
+        sys.exit(f"VOICEVOX に '{VV_NAME}' が見つからない。使える話者: {names}")
+    sp = hit[0]
+    st = next((x for x in sp["styles"] if x["name"] == VV_STYLE), sp["styles"][0])
+    VV_CREDIT = f"VOICEVOX:{sp['name']}"
+    print("VOICEVOX:", sp["name"], st["name"], st["id"], file=sys.stderr)
+    return st["id"]
+
+VV_ID = None
 def tts(s):
+    global VV_ID
+    if VV_NAME:
+        if VV_ID is None: VV_ID = vv_pick_speaker()
+        q = vv_call("/audio_query", query={"text": yomi(s), "speaker": VV_ID})
+        wav = vv_call("/synthesis", data=q, query={"speaker": VV_ID})
+        with wave.open(io.BytesIO(wav)) as w:
+            sr = w.getframerate(); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768.0
+        return x, sr
     x, sr = pyopenjtalk.tts(yomi(s), speed=1.0)
     x = x.astype(np.float32) / 32768.0 if x.dtype != np.float32 else x
     return x, sr

@@ -28,6 +28,16 @@ pip install --only-binary=:all: pyopenjtalk-plus pillow numpy
 python3 video/make_video.py   # -> video/out/explain.mp4
 ```
 
+## 音声を VOICEVOX にする
+エンジンを起動(既定 `http://127.0.0.1:50021`)してから、話者名の一部を指定する。
+
+```bash
+VOICEVOX_SPEAKER="ナースロボ" python3 video/make_video.py
+```
+
+`VOICEVOX_STYLE`(既定 ノーマル)、`VOICEVOX_URL` も指定できる。見つからなければ使える話者の一覧を出して止まる。
+動画の右下に `音声: VOICEVOX:話者名` のクレジットが入る。キャラごとの利用規約は必ず確認する。
+
 ## 注意
 - 中間ファイル(`voice.wav`, `frames/`)はコミットしない(`.gitignore` 済み)。
 - 合成音声は棒読み。品質が必要なら別の音声に差し替える。
