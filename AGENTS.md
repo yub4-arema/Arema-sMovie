@@ -38,6 +38,10 @@ VOICEVOX_SPEAKER="ナースロボ" python3 video/make_video.py
 `VOICEVOX_STYLE`(既定 ノーマル)、`VOICEVOX_URL` も指定できる。見つからなければ使える話者の一覧を出して止まる。
 動画の右下に `音声: VOICEVOX:話者名` のクレジットが入る。キャラごとの利用規約は必ず確認する。
 
+### 手元に環境がないとき(GitHub Actions)
+Actions タブの `make-video` → Run workflow で、話者名を入れて実行する。完成した mp4 は Artifacts(`explain-mp4`)からダウンロードできる。
+VOICEVOX のエンジンは Docker イメージ(`voicevox/voicevox_engine:cpu-latest`)で起動する。話者名を空にすると、棒読みの pyopenjtalk で作る。
+
 ## 注意
 - 中間ファイル(`voice.wav`, `frames/`)はコミットしない(`.gitignore` 済み)。
 - 合成音声は棒読み。品質が必要なら別の音声に差し替える。
