@@ -3,3 +3,4 @@ video/out/frames/
 video/out/list.txt
 __pycache__/
 video/out/ttscache/
+video/out/*.mp4
