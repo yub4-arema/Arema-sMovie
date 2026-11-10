@@ -1,0 +1,18 @@
+# 使い方:  VOICEVOX_SPEAKER=ナースロボ docker compose up --build --abort-on-container-exit
+# できあがり: video/out/explain.mp4
+services:
+  voicevox:
+    image: voicevox/voicevox_engine:cpu-latest
+  builder:
+    build: .
+    depends_on:
+      - voicevox
+    environment:
+      VOICEVOX_URL: http://voicevox:50021
+      VOICEVOX_SPEAKER: ${VOICEVOX_SPEAKER:-ナースロボ}
+      VOICEVOX_STYLE: ${VOICEVOX_STYLE:-ノーマル}
+    volumes:
+      - ./video/out:/app/video/out
+    # エンジンの起動を待ってから動画を作る
+    command: >
+      sh -c "for i in $$(seq 1 60); do python3 -c \"import urllib.request;urllib.request.urlopen('http://voicevox:50021/version')\" 2>/dev/null && break; sleep 3; done; python3 video/make_video.py"

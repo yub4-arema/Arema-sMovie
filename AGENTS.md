@@ -38,6 +38,15 @@ VOICEVOX_SPEAKER="ナースロボ" python3 video/make_video.py
 `VOICEVOX_STYLE`(既定 ノーマル)、`VOICEVOX_URL` も指定できる。見つからなければ使える話者の一覧を出して止まる。
 動画の右下に `音声: VOICEVOX:話者名` のクレジットが入る。キャラごとの利用規約は必ず確認する。
 
+### Docker で作る(おすすめ)
+Docker だけあれば、Python も ffmpeg も VOICEVOX も入れずに作れる。
+
+```bash
+VOICEVOX_SPEAKER=ナースロボ docker compose up --build --abort-on-container-exit
+```
+
+できあがりは `video/out/explain.mp4`。compose の話者の既定は「ナースロボ」。
+
 ### 手元に環境がないとき(GitHub Actions)
 Actions タブの `make-video` → Run workflow で、話者名を入れて実行する。完成した mp4 は Artifacts(`explain-mp4`)からダウンロードできる。
 VOICEVOX のエンジンは Docker イメージ(`voicevox/voicevox_engine:cpu-latest`)で起動する。話者名を空にすると、棒読みの pyopenjtalk で作る。
