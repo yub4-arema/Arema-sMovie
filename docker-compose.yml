@@ -1,4 +1,4 @@
-# 使い方:  VOICEVOX_SPEAKER=ナースロボ docker compose up --build --abort-on-container-exit
+# 使い方:  VOICEVOX_SPEAKER=ナースロボ＿タイプＴ docker compose up --build --abort-on-container-exit
 # できあがり: video/out/explain.mp4
 services:
   voicevox:
@@ -9,7 +9,8 @@ services:
       - voicevox
     environment:
       VOICEVOX_URL: http://voicevox:50021
-      VOICEVOX_SPEAKER: ${VOICEVOX_SPEAKER:-ナースロボ}
+      VOICEVOX_SPEAKER: ${VOICEVOX_SPEAKER:-ナースロボ＿タイプＴ}
+      VOICEVOX_SPEAKER2: ${VOICEVOX_SPEAKER2:-ランダム}
       VOICEVOX_STYLE: ${VOICEVOX_STYLE:-ノーマル}
     volumes:
       - ./video/out:/app/video/out

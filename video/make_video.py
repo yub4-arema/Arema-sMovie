@@ -347,27 +347,63 @@ def wrap(s, size, maxw):
         out.append(ln)
     return out
 
-def render(canvas_fn_list, sub):
+SPK_LABEL = {"解": ("解説", PURPLE), "相": ("相方", GREEN)}
+
+def render(canvas_fn_list, sub, spk="解"):
     im = Image.new("RGB", (W, H), BG); d = ImageDraw.Draw(im)
     for fn in canvas_fn_list: fn(d)
     if VV_CREDIT: d.text((W - 16, SUB_TOP - 28), "音声: " + VV_CREDIT, font=F(20), fill=GRAY, anchor="ra")
     d.rectangle([0, SUB_TOP, W, H], fill="#111827")
-    lines = wrap(sub, 32, 1160)
+    # 話者ラベル(解説=紫 / 相方=緑)
+    label, col = SPK_LABEL[spk]
+    lw = 150
+    d.rounded_rectangle([40, SUB_TOP + 40, 40 + lw, H - 40], 14, fill=col)
+    d.text((40 + lw / 2, SUB_TOP + (H - SUB_TOP) / 2), label, font=F(30), fill="white", anchor="mm")
+    lines = wrap(sub, 32, 1000)
     lh = 42; y0 = SUB_TOP + (H - SUB_TOP - lh * len(lines)) / 2
     for i, ln in enumerate(lines):
-        d.text((W / 2, y0 + i * lh), ln, font=F(32), fill="white", anchor="ma")
+        d.text((640 + lw / 2 + 10, y0 + i * lh), ln, font=F(32), fill="white", anchor="ma")
     return im
 
+# ---------- 掛け合い(話者の割り当て) ----------
+# 行頭に「解：」(解説役) か「相：」(相方) を付けると、その行の話者になる。
+# 付けない行は直前の話者(最初は解説役)。
+SPK_RE = re.compile(r"^\s*([解相])[:：]\s*(.*)$")
+def parse_say(say):
+    """台本の1ステップを [(話者, 文)] の列にする。文は「。」で区切り、短い文は次とつなげる。"""
+    out, cur = [], "解"
+    for line in say.split("\n"):
+        if not line.strip(): continue
+        m = SPK_RE.match(line)
+        if m: cur, line = m.group(1), m.group(2)
+        sents = []
+        for t in re.findall(r"[^。]+。?", line):
+            if sents and len(sents[-1]) < 14: sents[-1] += t
+            else: sents.append(t)
+        out += [(cur, x.strip()) for x in sents if x.strip()]
+    return out
+
 # ---------- 音声 ----------
-# VOICEVOX を使う: エンジンを起動してから
-#   VOICEVOX_SPEAKER="ナースロボ" python3 make_video.py
+# 解説役: VOICEVOX_SPEAKER(例 ナースロボ＿タイプＴ) / 相方: VOICEVOX_SPEAKER2(既定「ランダム」= メンバーから毎回ランダム)
+# 相方を固定するなら名前を指定する(例 里石ユカ)。
 # VOICEVOX_URL(既定 http://127.0.0.1:50021) / VOICEVOX_STYLE(既定 ノーマル) も指定できる。
-# 未指定なら pyopenjtalk(棒読み)を使う。
-import io, json, urllib.parse, urllib.request
+# 未指定なら pyopenjtalk(棒読み)を使う。相方は速さを変えて区別する。
+import io, json, urllib.parse, urllib.request, hashlib
 VV_URL = os.environ.get("VOICEVOX_URL", "http://127.0.0.1:50021")
-VV_NAME = os.environ.get("VOICEVOX_SPEAKER", "")
+# 相方のメンバー(VOICEVOXの話者名)。VOICEVOX_SPEAKER2 が未指定・「ランダム」なら、毎回この中から1人をランダムに選ぶ。
+MEMBERS = ["玄野武宏", "白上虎太郎", "青山龍星", "冥鳴ひまり", "九州そら", "ちび式じい", "櫻歌ミコ", "小夜/SAYO",
+           "ナースロボ＿タイプＴ", "あんこもん", "夜語トバリ", "暁記ミタマ", "里石ユカ"]
+import random
+_sub = os.environ.get("VOICEVOX_SPEAKER2", "ランダム")
+_main = os.environ.get("VOICEVOX_SPEAKER", "")
+if _sub in ("", "ランダム"):
+    _pool = [m for m in MEMBERS if not (_main and _main in m)] or MEMBERS
+    _sub = random.choice(_pool)
+    print("相方(ランダム):", _sub, file=sys.stderr)
+VV_NAMES = {"解": _main, "相": _sub}
 VV_STYLE = os.environ.get("VOICEVOX_STYLE", "ノーマル")
 VV_CREDIT = ""
+VV_IDS = {}   # 話者名 -> style id
 
 def vv_call(path, data=None, query=None):
     url = VV_URL + path + ("?" + urllib.parse.urlencode(query) if query else "")
@@ -375,63 +411,68 @@ def vv_call(path, data=None, query=None):
                                  headers={"Content-Type": "application/json"})
     return urllib.request.urlopen(req, timeout=120).read()
 
-def vv_pick_speaker():
-    global VV_CREDIT
+def vv_resolve(name):
+    """話者名の一部から VOICEVOX の style id を決める。見つからなければ一覧を出して止まる。"""
+    if name in VV_IDS: return VV_IDS[name]
     speakers = json.loads(vv_call("/speakers"))
-    hit = [sp for sp in speakers if VV_NAME in sp["name"]]
+    hit = [sp for sp in speakers if name in sp["name"]]
     if not hit:
         names = ", ".join(sp["name"] for sp in speakers)
-        sys.exit(f"VOICEVOX に '{VV_NAME}' が見つからない。使える話者: {names}")
+        sys.exit(f"VOICEVOX に '{name}' が見つからない。使える話者: {names}")
     sp = hit[0]
     st = next((x for x in sp["styles"] if x["name"] == VV_STYLE), sp["styles"][0])
-    VV_CREDIT = f"VOICEVOX:{sp['name']}"
     print("VOICEVOX:", sp["name"], st["name"], st["id"], file=sys.stderr)
+    VV_IDS[name] = st["id"]
     return st["id"]
 
-VV_ID = None
-import hashlib
-def tts(s):
+def setup_voices():
+    """使う話者を最初に確定し、クレジットを作る(描画より前に決める)。"""
+    global VV_CREDIT
+    real = []
+    for k in ("解", "相"):
+        if VV_NAMES[k]:
+            vv_resolve(VV_NAMES[k])
+            real.append(next(sp["name"] for sp in json.loads(vv_call("/speakers")) if VV_NAMES[k] in sp["name"]))
+    if real:
+        VV_CREDIT = " / ".join(f"VOICEVOX:{n}" for n in dict.fromkeys(real))
+
+def tts(s, spk="解"):
     """文ごとの音声をディスクにキャッシュ(同じ文・同じ話者なら再合成しない)。"""
-    key = hashlib.sha1((VV_NAME + VV_STYLE + yomi(s)).encode()).hexdigest()
+    key = hashlib.sha1((spk + VV_NAMES[spk] + VV_STYLE + yomi(s)).encode()).hexdigest()
     cp = os.path.join(OUT, "ttscache"); os.makedirs(cp, exist_ok=True); cf = os.path.join(cp, key + ".npz")
     if os.path.exists(cf):
         z = np.load(cf); return z["x"], int(z["sr"])
-    x, sr = tts_raw(s)
+    x, sr = tts_raw(s, spk)
     np.savez(cf, x=x, sr=sr); return x, sr
 
-def tts_raw(s):
-    global VV_ID
-    if VV_NAME:
-        if VV_ID is None: VV_ID = vv_pick_speaker()
-        q = vv_call("/audio_query", query={"text": yomi(s), "speaker": VV_ID})
-        wav = vv_call("/synthesis", data=q, query={"speaker": VV_ID})
+def tts_raw(s, spk="解"):
+    if VV_NAMES[spk]:
+        sid = vv_resolve(VV_NAMES[spk])
+        q = vv_call("/audio_query", query={"text": yomi(s), "speaker": sid})
+        wav = vv_call("/synthesis", data=q, query={"speaker": sid})
         with wave.open(io.BytesIO(wav)) as w:
             sr = w.getframerate(); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768.0
         return x, sr
-    x, sr = pyopenjtalk.tts(yomi(s), speed=1.0)
+    x, sr = pyopenjtalk.tts(yomi(s), speed=1.0 if spk == "解" else 1.15)
     x = x.astype(np.float32) / 32768.0 if x.dtype != np.float32 else x
     return x, sr
 
 def main():
     fdir = os.path.join(OUT, "frames"); os.makedirs(fdir, exist_ok=True)
+    setup_voices()
     audio, listing, sr0, idx = [], [], None, 0
     for sc in S:
         fns = []
         for say, fn, reset in sc["steps"]:
             if reset: fns = []
             fns.append(fn)
-            sents = []
-            for t in re.findall(r"[^。]+。?", say):
-                if sents and len(sents[-1]) < 14: sents[-1] += t   # 短い文は次とつなげる
-                else: sents.append(t)
-            for sent in sents:
-                x, sr = tts(sent.strip()); sr0 = sr
+            for spk, sent in parse_say(say):
+                x, sr = tts(sent, spk); sr0 = sr
                 pad = np.zeros(int(sr * 0.45), np.float32)
                 clip = np.concatenate([x, pad]); audio.append(clip)
                 p = os.path.join(fdir, f"f{idx:03d}.png")
-                render(fns, sent.strip().rstrip("。")).save(p)
+                render(fns, sent.rstrip("。"), spk).save(p)
                 listing.append((p, len(clip) / sr)); idx += 1
-        # シーン間の小休止は最後のフレームに含まれる
         print("scene", sc["name"], "ok", file=sys.stderr)
     wav = np.concatenate(audio)
     wp = os.path.join(OUT, "voice.wav")
