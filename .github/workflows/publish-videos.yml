@@ -1,0 +1,41 @@
+name: publish-videos
+# 公開の条件: add-explainer-video への push で、コミットメッセージに [publish] を含むとき。
+# 手動実行(workflow_dispatch)でも公開できる。動画は Release に添付し、リポジトリには入れない。
+on:
+  push:
+    branches: [add-explainer-video]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-ipafont-gothic
+          pip install --only-binary=:all: pyopenjtalk-plus pillow numpy
+      - name: Start VOICEVOX engine
+        run: |
+          docker run -d --name vv -p 50021:50021 voicevox/voicevox_engine:cpu-latest
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:50021/version && break; sleep 3; done
+      - name: Build short video
+        env:
+          VOICEVOX_SPEAKER: ナースロボ＿タイプＴ
+        run: python3 video/make_video.py
+      - name: Build deep video
+        env:
+          VOICEVOX_SPEAKER: ナースロボ＿タイプＴ
+          OUT_NAME: deep.mp4
+        run: python3 video/make_deep.py
+      - name: Publish GitHub Release with the videos
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="videos-$(date -u +%Y%m%d-%H%M)"
+          gh release create "$TAG" video/out/explain.mp4 video/out/deep.mp4 \
+            --target "$GITHUB_SHA" --title "解説動画 $TAG" \
+            --notes "解説動画です。mp4 は Release に添付しています。音声は VOICEVOX（ナースロボ＿タイプＴ、相方はランダム）。キャラごとの利用規約を確認してください。"
