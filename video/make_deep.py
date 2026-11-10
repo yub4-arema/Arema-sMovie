@@ -51,8 +51,14 @@ def chapter(num, name, blurb, skip):
         text(d, 640, 450, skip, 28, ORANGE, "ma")
     return f
 
+LABELS = {"blog": "ブログに書かれていること", "paper": "Moshi論文に書かれていること", "gen": "一般的な仕組みの説明",
+          "guess": "推測(書かれていない)", "news": "報道・第三者の記事", "claim": "Blockの主張(未検証)"}
 def head(d, s, kind=None):
-    title(d, s)
+    avail = 1200 - (F(22).getlength(LABELS[kind]) + 28 + 30 if kind else 0)
+    size = 40
+    while size > 24 and F(size).getlength(s) > avail: size -= 1
+    text(d, 40, 28 + (40 - size) // 2, s, size, INK, bold=True)
+    d.line([40, 84, 1240, 84], fill=SOFT, width=3)
     if kind: src(d, kind)
 
 def arrowdown(d, x, y1, y2, col=INK): arrow(d, x, y1, x, y2, col)
@@ -315,8 +321,8 @@ def d_3b(d):
     text(d, 40, 130, "カスケード", 26, GRAY, bold=True)
     box(d, 200, 120, 330, 50, "ユーザー「京都のおすすめは？」", GRAY, 22); box(d, 560, 120, 240, 50, "…待つ…", ORANGE, 22); box(d, 830, 120, 380, 50, "AI「嵐山はどうですか」", PURPLE, 22)
     text(d, 40, 260, "全二重", 26, GRAY, bold=True)
-    box(d, 200, 250, 190, 50, "ユーザー「京都…」", GRAY, 22); box(d, 400, 250, 250, 50, "「おすすめは？」", GRAY, 22)
-    box(d, 330, 320, 120, 50, "うん", PURPLE, 22); box(d, 670, 320, 540, 50, "AI「嵐山はどうですか。竹林がきれいで…」", PURPLE, 22)
+    box(d, 200, 250, 240, 50, "ユーザー「京都…」", GRAY, 22); box(d, 450, 250, 250, 50, "「おすすめは？」", GRAY, 22)
+    box(d, 330, 320, 120, 50, "うん", PURPLE, 22); box(d, 720, 320, 490, 50, "AI「嵐山はどうですか。竹林がきれいで…」", PURPLE, 22)
     text(d, 40, 330, "AI", 24, GRAY, bold=True); text(d, 40, 260 + 100, "", 20)
     text(d, 40, 440, "常に聞き続け、常に(声か、無音を)出し続ける。いつ話し、いつ黙るかも、モデル自身が決める。", 26, PURPLE, bold=True)
 step(st, "全二重、フルデュプレックスは、聞きながら、同時に話せる方式です。電話で、話しながら相手の声も聞こえている状態です。", d_3b, True)
@@ -436,10 +442,10 @@ def d_4e(d):
     box(d, 40, 160, 360, 62, "「10万円で京都旅行に行きたい」", GRAY, 22)
     box(d, 40, 245, 360, 56, "DELEGATE トークンを出す", ORANGE, 22); arrow(d, 402, 272, 760, 272, ORANGE)
     box(d, 770, 245, 440, 56, "Webを検索する(7.1秒かかった)", GREEN, 22)
-    box(d, 40, 330, 520, 62, "「抹茶スイーツいいですね。10万円で…プランを探しますね」", PURPLE, 20); text(d, 600, 350, "← 検索中も、しゃべり続ける", 22, ORANGE)
+    box(d, 40, 330, 540, 62, "「抹茶スイーツいいですね。探しますね」", PURPLE, 22); text(d, 600, 350, "← 検索中も、しゃべり続ける", 22, ORANGE)
     arrow(d, 770, 300, 770, 420, GREEN) if False else None
     box(d, 770, 425, 440, 56, "結果を、会話担当に返す", GREEN, 22); arrow(d, 760, 453, 410, 453, GREEN)
-    box(d, 40, 425, 360, 56, "「調べました! 3泊だと宿泊費が主な出費で…」", PURPLE, 18)
+    box(d, 40, 425, 360, 56, "「調べました! 宿泊費が主な出費で…」", PURPLE, 18)
     text(d, 40, 510, "ブログ図5の例。結果が届いたら、会話担当が「自分の言葉」で伝える", 24, INK)
 step(st, "DELEGATEです。会話担当のモデルが、難しい依頼を、背景モデルにまかせる仕組みです。ブログの図五の例を見ましょう。", d_4e, True)
 step(st, "十万円で京都旅行に行きたい、と言われると、会話担当がDELEGATEトークンを出して、依頼を送ります。", lambda d: None)
@@ -542,7 +548,7 @@ step(st, "返答の中身です。こちらは、GPT-Liveのほうが、すべ�
 step(st, "複数ターンのQAで、七十九パーセント対九十五パーセント。ウェブ検索が必要な質問で、四十三対五十です。", lambda d: None)
 step(st, "また、他の日本語の全二重モデル、J-MoshiやLLM-jp-Moshiの正答率は、ほぼゼロから数パーセントでした。それよりは、はるかに上です。", lambda d: None)
 def d_5e(d):
-    head(d, "5-5  数字を読むときの注意", "gen")
+    head(d, "5-5  数字を読むときの注意", "blog")
     lines(d, 60, 140, ["① 測ったのは、Shizuku AI 自身。独立した第三者の評価は、見つけられなかった", "② ベンチマークも、自社で作ったもの(英語版でGPT-Liveの公式スコアとは一致を確認)",
                        "③ 内容の採点は、別のLLM(Claude Opus 5.5)が行っている", "④ 返答時間は、測り方がモデルごとに違う(ネットワーク往復を含む/含まない)",
                        "⑤ 「GPT-Live」と比べて、Shizukuは「タイミングは強く、中身は劣る」という結果"], 28, INK, 18)
@@ -611,7 +617,7 @@ step(st, "評価では、タイミングが強く、返答の中身はGPT-Live�
 st = scene("sources")
 def d_src(d):
     head(d, "出典")
-    lines(d, 40, 110, ["Shizuku AI, “Shizuku-Duplex: Japanese Full-Duplex Model for Natural Conversation”, 2026-11-08  shizuku.ai/en/blog/1/",
+    lines(d, 40, 110, ["Shizuku AI, “Shizuku-Duplex: Japanese Full-Duplex Model for Natural Conversation”,", "   2026-11-08  shizuku.ai/en/blog/1/",
                        "Défossez et al., “Moshi: a speech-text foundation model for real-time dialogue”, arXiv:2410.00037",
                        "OpenAI, “Introducing GPT-Live”, 2026-07  (報道: 二層構成・GPT-5.5 は第三者の記事による)", "Block, “Dessa” (block.xyz/dessa) と報道。内部の技術詳細は未公開",
                        "", "一般論の部分(トークン化、埋め込み、注意、量子化など)は、広く知られた仕組みの説明で、", "例の数字は、わかりやすくするための例です。",

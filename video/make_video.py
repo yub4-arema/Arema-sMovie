@@ -389,7 +389,17 @@ def vv_pick_speaker():
     return st["id"]
 
 VV_ID = None
+import hashlib
 def tts(s):
+    """文ごとの音声をディスクにキャッシュ(同じ文・同じ話者なら再合成しない)。"""
+    key = hashlib.sha1((VV_NAME + VV_STYLE + yomi(s)).encode()).hexdigest()
+    cp = os.path.join(OUT, "ttscache"); os.makedirs(cp, exist_ok=True); cf = os.path.join(cp, key + ".npz")
+    if os.path.exists(cf):
+        z = np.load(cf); return z["x"], int(z["sr"])
+    x, sr = tts_raw(s)
+    np.savez(cf, x=x, sr=sr); return x, sr
+
+def tts_raw(s):
     global VV_ID
     if VV_NAME:
         if VV_ID is None: VV_ID = vv_pick_speaker()
