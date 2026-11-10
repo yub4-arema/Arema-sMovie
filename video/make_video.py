@@ -352,10 +352,10 @@ def render(canvas_fn_list, sub):
     for fn in canvas_fn_list: fn(d)
     if VV_CREDIT: d.text((W - 16, SUB_TOP - 28), "音声: " + VV_CREDIT, font=F(20), fill=GRAY, anchor="ra")
     d.rectangle([0, SUB_TOP, W, H], fill="#111827")
-    lines = wrap(sub, 34, 1160)
-    lh = 46; y0 = SUB_TOP + (H - SUB_TOP - lh * len(lines)) / 2
+    lines = wrap(sub, 32, 1160)
+    lh = 42; y0 = SUB_TOP + (H - SUB_TOP - lh * len(lines)) / 2
     for i, ln in enumerate(lines):
-        d.text((W / 2, y0 + i * lh), ln, font=F(34), fill="white", anchor="ma")
+        d.text((W / 2, y0 + i * lh), ln, font=F(32), fill="white", anchor="ma")
     return im
 
 # ---------- 音声 ----------
@@ -432,7 +432,7 @@ def main():
     with open(lp, "w") as f:
         for p, dur in listing: f.write(f"file '{p}'\nduration {dur:.3f}\n")
         f.write(f"file '{listing[-1][0]}'\n")
-    mp = os.path.join(OUT, "explain.mp4")
+    mp = os.path.join(OUT, os.environ.get("OUT_NAME", "explain.mp4"))
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", lp, "-i", wp,
                     "-vf", "fps=30,format=yuv420p", "-c:v", "libx264", "-c:a", "aac", "-b:a", "160k", "-shortest", mp], check=True)
     print("done", mp, f"{len(wav)/sr0:.1f}s")
